@@ -1,34 +1,38 @@
 # PRISM — News Bias & Transparency Platform (PRD)
 
 ## Original problem
-Build an AI-Powered News Bias & Transparency Platform that collects news articles from multiple publishers about the same events, runs an ML pipeline (sentiment / framing / entities / clustering / neutral summary) and presents them in an interactive dashboard for side-by-side comparison.
+AI-Powered News Bias & Transparency Platform: collect articles from multiple publishers about the same events, run ML pipeline (sentiment / framing / entities / clustering / neutral summary), present in interactive dashboard, deliver daily digest.
 
-## Tech stack (adapted for Emergent environment)
+## Tech stack (Emergent-adapted)
 - Frontend: React CRA + Tailwind + Framer Motion + Recharts + React Query + Sonner + Lucide
-- Backend: FastAPI + MongoDB (Motor async)
-- ML/AI: VADER (sentiment, pre-computed in seed), Emergent LLM (Claude Sonnet 4.6) for neutral cross-article summaries. Frame labels precomputed in seed.
-
-## User personas
-- News reader wanting to spot bias & compare coverage
-- Journalist / researcher tracking framing across outlets
-- Media literacy educator
+- Backend: FastAPI + MongoDB (Motor async) + APScheduler
+- ML/AI: VADER sentiment + Emergent LLM (gpt-4o-mini for framing/NER, gpt-4o for neutral summaries) + TF-IDF/cosine clustering
+- Ingestion: feedparser + trafilatura + httpx across 10 RSS feeds
+- Email: Resend (sandbox `onboarding@resend.dev`) + Mongo subscribers with unsubscribe tokens
 
 ## Phase 1 — SHIPPED (2026-02)
-- Seeded 5 story clusters / 30 realistic articles (Tesla, Fed, Climate, AI reg, Semiconductor)
-- Backend endpoints: `/api/health`, `/api/stats`, `/api/stories` (filters + sort), `/api/stories/{id}`, `/api/search`
-- On-demand neutral summary generation via Claude Sonnet, cached in Mongo
-- Frontend: Home feed with hero + stats + filters + story grid; Story Detail with neutral summary + stat blocks + publisher perspective grid + sentiment bar chart + frame radar chart + bias divergence gauge + entity chips; Search page; About page
-- Dark Bloomberg-Terminal aesthetic (Chivo / IBM Plex Sans / JetBrains Mono; slate palette; grain overlay)
+- 5 seeded story clusters, 30 articles, Bloomberg-Terminal aesthetic, Story Detail with charts
 
-## Phase 2 — deferred backlog
-- P0: Live RSS ingestion + APScheduler hourly job (Reuters, BBC, Bloomberg, CNBC, Guardian, Al Jazeera, NPR, Fox, Hindu, ToI)
-- P0: real embeddings + DBSCAN clustering (replace seeded clusters)
-- P1: Compare page — side-by-side 4-way article diff
-- P1: Sources page — publisher bias profiles with sentiment-over-time line chart, frame pie chart
-- P1: Publication timeline scatter chart on Story Detail
-- P2: Entity drill-down pages / trending entities sidebar
+## Phase 2 — SHIPPED (2026-02)
+- **Real RSS ingestion** from 10 feeds (7 live in current pod) via feedparser + trafilatura
+- **Full ML pipeline**: VADER sentiment + gpt-4o-mini framing (10 labels) + gpt-4o-mini NER (PERSON/ORG/GPE/MONEY) + gpt-4o cross-article neutral summaries
+- **TF-IDF clustering** with union-find (threshold 0.35) forming story clusters
+- **All 18 endpoints live**: /health /stats /stories /stories/{id} /compare /sentiment /entities /search /sources /sources/{name} /trending /ingest/trigger /ingest/status /ingest/history /subscribe /unsubscribe /digest/preview /digest/send-now
+- **Frontend additions**: Home trending sidebar, digest subscribe form, ingest trigger button, Sources index page + publisher deep-dive (sentiment timeline + frame pie + recent articles), Compare page with side-by-side full-text
+- **Email digest**: daily 13:00 UTC cron via APScheduler picks most-divided cluster, sends via Resend HTML/text with unsubscribe token
+- **APScheduler**: hourly ingest + daily digest running
+
+## Testing status
+- 20/20 pytest backend tests passing (100%)
+- All critical frontend flows verified via Playwright (100%)
+
+## Phase 3 backlog
+- P1: Advanced Compare — diff highlighting for unique paragraphs
+- P1: Publication timeline scatter on Story Detail (Recharts ScatterChart)
+- P2: Entity drill-down pages (`/entity/{name}` — all stories mentioning)
 - P2: Debounced live semantic search suggestions
-- P2: Compare view diff highlighting for unique paragraphs
+- P2: Custom sender domain for Resend (currently sandbox)
+- P2: Per-cluster social share card (image render)
 
 ## Test credentials
-No auth in Phase 1.
+No auth. Test subscribers: test-e2e@example.com, test-frontend@example.com
