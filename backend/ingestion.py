@@ -1,4 +1,11 @@
-"""RSS ingestion: fetch, dedup, clean full-text, store raw articles in MongoDB."""
+"""RSS ingestion: fetch, dedup, clean full-text, store raw articles in MongoDB.
+
+Design:
+- Parallel per-feed fetch (asyncio.gather over all feeds)
+- Parallel per-article full-text fetch inside a feed (bounded semaphore)
+- Short timeouts + fallback to RSS summary so a slow site can never hang the pipeline
+- Hard outer timeout on the whole ingestion step so the UI never appears stuck
+"""
 import asyncio
 import hashlib
 import logging
@@ -18,6 +25,10 @@ log = logging.getLogger("ingestion")
 
 TRACKING_PARAMS = {"utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content", "fbclid", "gclid", "ref", "share"}
 MAX_ARTICLES_PER_SOURCE = int(os.environ.get("MAX_ARTICLES_PER_SOURCE", "15"))
+FEED_FETCH_TIMEOUT = 8.0
+ARTICLE_FETCH_TIMEOUT = 6.0
+INGEST_HARD_TIMEOUT = 90.0  # entire ingest step must finish within this
+ARTICLE_CONCURRENCY = 8  # concurrent article body fetches per feed
 
 
 def normalize_url(url: str) -> str:
@@ -43,7 +54,7 @@ def word_count(text: str) -> int:
 
 async def _fetch_full_text(client: httpx.AsyncClient, url: str) -> str:
     try:
-        r = await client.get(url, timeout=15.0, follow_redirects=True, headers={"User-Agent": "Mozilla/5.0 PrismBot/1.0"})
+        r = await client.get(url, timeout=ARTICLE_FETCH_TIMEOUT, follow_redirects=True, headers={"User-Agent": "Mozilla/5.0 PrismBot/1.0"})
         if r.status_code >= 400:
             return ""
         text = trafilatura.extract(r.text, include_comments=False, include_tables=False, favor_precision=True) or ""
@@ -65,79 +76,113 @@ def _parse_published(entry) -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-async def _process_feed(client: httpx.AsyncClient, source: str, feed_url: str, existing_hashes: set) -> List[Dict[str, Any]]:
+def _build_article_doc(source: str, entry, raw_url: str, u_hash: str, content: str) -> Optional[Dict[str, Any]]:
+    title = (entry.get("title") or "").strip()
+    if not title:
+        return None
+    wc = word_count(content)
+    if wc < 40:  # loosened so we still keep articles when only RSS summary is available
+        return None
+    return {
+        "id": f"art-{u_hash[:12]}",
+        "url_hash": u_hash,
+        "content_hash": content_hash(title, content),
+        "source": source,
+        "title": title,
+        "url": raw_url,
+        "content": content,
+        "excerpt": content[:400],
+        "word_count": wc,
+        "published_at": _parse_published(entry),
+        "ingested_at": datetime.now(timezone.utc).isoformat(),
+        "cluster_id": None,
+        "sentiment_label": None,
+        "sentiment_score": None,
+        "primary_frame": None,
+        "entities": None,
+        "processed": False,
+    }
+
+
+async def _process_feed(client: httpx.AsyncClient, source: str, feed_url: str, existing_hashes: set, progress: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Fetch a single RSS feed, then fetch article bodies in parallel."""
     try:
-        r = await client.get(feed_url, timeout=15.0, follow_redirects=True, headers={"User-Agent": "Mozilla/5.0 PrismBot/1.0"})
+        r = await client.get(feed_url, timeout=FEED_FETCH_TIMEOUT, follow_redirects=True, headers={"User-Agent": "Mozilla/5.0 PrismBot/1.0"})
         parsed = feedparser.parse(r.content)
     except Exception as e:
         log.warning("feed fetch failed %s: %s", source, e)
+        progress["feeds_done"] += 1
+        progress["feeds_failed"].append(source)
         return []
 
     entries = parsed.entries[:MAX_ARTICLES_PER_SOURCE]
-    out: List[Dict[str, Any]] = []
+    # deduplicate URLs BEFORE hitting the network
+    todo = []
     for entry in entries:
-        raw_url = entry.get("link", "")
+        raw_url = (entry.get("link") or "").strip()
         if not raw_url:
             continue
         u_hash = url_hash(raw_url)
         if u_hash in existing_hashes:
             continue
-        title = (entry.get("title") or "").strip()
-        if not title:
-            continue
+        existing_hashes.add(u_hash)  # claim it now to avoid dup across parallel feeds
+        todo.append((entry, raw_url, u_hash))
+
+    sem = asyncio.Semaphore(ARTICLE_CONCURRENCY)
+
+    async def _one(entry, raw_url, u_hash):
         summary = re.sub(r"<[^>]+>", " ", entry.get("summary", "") or "").strip()
-        full = await _fetch_full_text(client, raw_url)
+        # Fetch full text but fall back to RSS summary quickly on failure/timeout
+        async with sem:
+            full = await _fetch_full_text(client, raw_url)
         content = (full or summary or "").strip()
-        wc = word_count(content)
-        if wc < 60:
-            continue
-        published_at = _parse_published(entry)
-        excerpt = content[:400]
-        c_hash = content_hash(title, content)
-        out.append({
-            "id": f"art-{u_hash[:12]}",
-            "url_hash": u_hash,
-            "content_hash": c_hash,
-            "source": source,
-            "title": title,
-            "url": raw_url,
-            "content": content,
-            "excerpt": excerpt,
-            "word_count": wc,
-            "published_at": published_at,
-            "ingested_at": datetime.now(timezone.utc).isoformat(),
-            "cluster_id": None,
-            "sentiment_label": None,
-            "sentiment_score": None,
-            "primary_frame": None,
-            "entities": None,
-            "processed": False,
-        })
-        existing_hashes.add(u_hash)
+        return _build_article_doc(source, entry, raw_url, u_hash, content)
+
+    results = await asyncio.gather(*[_one(*t) for t in todo], return_exceptions=True)
+    out: List[Dict[str, Any]] = []
+    for d in results:
+        if isinstance(d, dict):
+            out.append(d)
+    progress["feeds_done"] += 1
+    progress["articles_found"] += len(out)
     return out
 
 
-async def ingest_all_feeds(db) -> List[Dict[str, Any]]:
-    """Fetch every RSS feed in parallel, dedup, store. Returns list of NEW article docs."""
+async def ingest_all_feeds(db, progress: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
+    """Fetch every RSS feed in parallel with hard wall-clock timeout. Returns list of NEW article docs.
+
+    progress dict is mutated in-place so the pipeline task can expose live counts.
+    """
+    if progress is None:
+        progress = {}
     log.info("Starting ingestion of %d feeds", len(RSS_FEEDS))
     existing = await db.articles.distinct("url_hash")
     existing_set = set(existing)
-    log.info("existing url_hashes: %d", len(existing_set))
+    progress["feeds_total"] = len(RSS_FEEDS)
+    progress["feeds_done"] = 0
+    progress["feeds_failed"] = []
+    progress["articles_found"] = 0
 
     new_articles: List[Dict[str, Any]] = []
-    async with httpx.AsyncClient() as client:
-        tasks = [_process_feed(client, source, feed_url, existing_set) for source, feed_url, _ in RSS_FEEDS]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-    for source_result in results:
-        if isinstance(source_result, Exception):
-            log.warning("feed exception: %s", source_result)
-            continue
-        new_articles.extend(source_result)
+    try:
+        async with httpx.AsyncClient() as client:
+            async def _bounded():
+                tasks = [_process_feed(client, source, feed_url, existing_set, progress) for source, feed_url, _ in RSS_FEEDS]
+                results = await asyncio.gather(*tasks, return_exceptions=True)
+                for source_result in results:
+                    if isinstance(source_result, Exception):
+                        log.warning("feed exception: %s", source_result)
+                        continue
+                    new_articles.extend(source_result)
+            await asyncio.wait_for(_bounded(), timeout=INGEST_HARD_TIMEOUT)
+    except asyncio.TimeoutError:
+        log.warning("Ingestion hit hard timeout of %ss; keeping %d articles collected so far", INGEST_HARD_TIMEOUT, len(new_articles))
+        progress["timeout"] = True
 
     if new_articles:
         try:
             await db.articles.insert_many(new_articles, ordered=False)
         except Exception as e:
             log.warning("insert_many partial: %s", e)
-    log.info("Ingestion complete: %d new articles", len(new_articles))
+    log.info("Ingestion complete: %d new articles (%d/%d feeds, %d failed)", len(new_articles), progress.get("feeds_done", 0), len(RSS_FEEDS), len(progress.get("feeds_failed", [])))
     return new_articles

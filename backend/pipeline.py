@@ -159,8 +159,18 @@ async def _run(db, task_id: str):
 
     t["status"] = "running"
     try:
-        # 1. Ingest
-        new = await _step("ingest", ingest_all_feeds(db))
+        # 1. Ingest — with live per-feed sub-progress
+        t["steps"].append({"name": "ingest", "status": "running", "at": datetime.now(timezone.utc).isoformat(), "progress": {}})
+        ingest_progress: Dict[str, Any] = {}
+        t["steps"][-1]["progress"] = ingest_progress
+        try:
+            new = await ingest_all_feeds(db, ingest_progress)
+            t["steps"][-1]["status"] = "done"
+        except Exception as e:
+            log.exception("ingest step failed: %s", e)
+            t["steps"][-1]["status"] = "error"
+            t["steps"][-1]["error"] = str(e)
+            raise
         t["new_articles"] = len(new)
 
         # 2. Enrich unprocessed articles (limit to keep runs bounded)

@@ -106,6 +106,8 @@ export default function IngestProgress({ taskId, onComplete }) {
               const running = s.status === "running";
               const done = s.status === "done";
               const error = s.status === "error";
+              const prog = s.progress || {};
+              const showSubProgress = s.name === "ingest" && running && prog.feeds_total;
               return (
                 <li key={i} className="flex items-center gap-3 font-mono text-[11px]">
                   <span
@@ -116,6 +118,15 @@ export default function IngestProgress({ taskId, onComplete }) {
                   <span className={done ? "text-slate-300" : running ? "text-slate-100" : error ? "text-rose-300" : "text-slate-500"}>
                     {label}
                     {s.name.includes("(") ? <span className="text-slate-500"> {s.name.slice(s.name.indexOf("("))}</span> : null}
+                    {showSubProgress && (
+                      <span className="text-slate-500 ml-2">
+                        · {prog.feeds_done}/{prog.feeds_total} feeds
+                        {prog.articles_found > 0 && <span className="text-emerald-400"> · {prog.articles_found} new</span>}
+                      </span>
+                    )}
+                    {s.name === "ingest" && done && prog.feeds_failed?.length > 0 && (
+                      <span className="text-slate-500 ml-2">· {prog.feeds_done - prog.feeds_failed.length}/{prog.feeds_total} feeds ok</span>
+                    )}
                   </span>
                   <span className="ml-auto text-[10px] text-slate-600">
                     {running ? "running…" : done ? "done" : error ? "error" : "queued"}
