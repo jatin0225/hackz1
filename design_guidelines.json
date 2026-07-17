@@ -1,0 +1,113 @@
+{
+  "theme": "dark",
+  "archetype": "Swiss & High-Contrast (Dark Mode Variant)",
+  "typography": {
+    "headings": "Chivo",
+    "body": "IBM Plex Sans",
+    "mono": "JetBrains Mono",
+    "rules": [
+      "NEVER use Inter, Roboto, Open Sans, or Lato for headings.",
+      "Use tight letter spacing (tracking-tight) for all headings > 32px.",
+      "Headings must not exceed text-4xl (fluid scaling clamp preferred).",
+      "Overlines and Labels MUST be Uppercase, text-xs, and wide spacing (tracking-[0.2em]).",
+      "Use JetBrains Mono for data points, tags, and entity extraction chips."
+    ]
+  },
+  "colors": {
+    "background": "#020617",
+    "surface": "#0f172a",
+    "surface_hover": "#1e293b",
+    "border": "#1e293b",
+    "text_primary": "#f8fafc",
+    "text_secondary": "#94a3b8",
+    "sentiment": {
+      "positive": "#10b981",
+      "neutral": "#60a5fa",
+      "negative": "#f43f5e"
+    },
+    "bias": {
+      "left": "#3b82f6",
+      "center": "#a855f7",
+      "right": "#ef4444"
+    },
+    "rules": [
+      "Dark-mode only. Use true greys (slate), NEVER pure black (#000000).",
+      "Use 1-2 vivid accent colors while keeping charts and surrounding UI muted.",
+      "NEVER use full-screen gradients or generic gloss. Flat, matte, and dense."
+    ]
+  },
+  "visual_enhancers": {
+    "elevation": "No drop shadows. Use background lightness steps (slate-950 -> slate-900 -> slate-800) and 1px border-slate-800 for elevation.",
+    "textures": "Subtle grain overlay to reduce 'digital flatness'. Keep it extremely subtle.",
+    "glassmorphism": "Used exclusively for sticky headers (bg-slate-950/70 backdrop-blur-xl border-b border-slate-800). No transparent dropdowns."
+  },
+  "components": {
+    "cards": "Borderless or 1px subtle border. High-density rectangles. DO NOT overuse the standard Vercel-look card. Make it feel like a terminal.",
+    "charts": "Recharts. Dark-first palettes. Bright, thin lines (stroke-width: 2) and highly translucent fills (opacity-20).",
+    "badges": "Entity chips must be monospaced, tightly padded (px-2 py-0.5), with a subtle colored background (bg-slate-800 text-slate-300).",
+    "buttons": "Pill-shaped or sharp rectangular (rounded-none or rounded-sm). No soft 8px radii. Use solid accent for primary, flat slate-800 for secondary."
+  },
+  "grids_and_layouts": {
+    "dashboard": "High Density Grid (Mode B). grid-cols-1 md:grid-cols-3 lg:grid-cols-4. Tight gaps (gap-4 or gap-6).",
+    "split_pane": "Side-by-side publisher perspective grids must use equal heights (h-full) and span full columns to create a tight, unbroken flow of data.",
+    "spacing": "Generous outer padding (p-6 to p-12) for layout breathing room, but dense inner spacing (p-3, p-4) for data readability inside cards."
+  },
+  "motion": {
+    "hover": "Use background color shifts (bg-slate-900 to bg-slate-800) with specific transitions. NO scaling (no hover:scale-105).",
+    "transitions": "Use specific properties (transition-colors duration-200). DO NOT use 'transition: all'."
+  },
+  "accessibility": {
+    "contrast": "Maintain WCAG AA minimum 4.5:1 for body text. Off-white (#e5e7eb) is preferred over pure white (#ffffff) to cut glare.",
+    "testing": "All interactive and key informational elements MUST include a 'data-testid' attribute (e.g., data-testid='publisher-filter-btn')."
+  },
+  "media": {
+    "image_urls": [
+      {
+        "url": "https://images.unsplash.com/photo-1503694978374-8a2fa686963a",
+        "description": "Printing machine - Use for 'Sources' page banner or background texture for bias profiles.",
+        "category": "backgrounds"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1498644035638-2c3357894b10",
+        "description": "Piles of newspapers - Use for Story Detail fallback image or 'Home' trending topics section.",
+        "category": "thumbnails"
+      },
+      {
+        "url": "https://images.pexels.com/photos/17279851/pexels-photo-17279851.jpeg",
+        "description": "Abstract data dark - Use for 'Compare' or 'Search' empty states / placeholder graphics.",
+        "category": "abstract"
+      }
+    ]
+  },
+  "libraries": {
+    "charts": "recharts",
+    "icons": "@phosphor-icons/react",
+    "ui": "shadcn/ui",
+    "motion": "framer-motion"
+  },
+  "instructions_to_main_agent": [
+    "Implement a dark-mode ONLY dashboard. Hardcode the dark theme classes and remove all dark: prefixes if necessary, or force dark mode on the root.",
+    "Install and use @phosphor-icons/react for all icons, suitable for dense data UI.",
+    "Use Recharts for the Sentiment horizontal bar chart and Frame radar chart. Customize Recharts tooltips to look like dark-mode Shadcn popovers.",
+    "The layout must feel like a cross between a Bloomberg Terminal and Ground News: Data-dense, highly analytical, objective, and authoritative.",
+    "Side-by-side publisher perspectives should use a strict grid with border-collapse or 1px subtle borders to look like a connected matrix.",
+    "Do NOT use native HTML <select> or <input type='date'>. Use Shadcn DropdownMenu, Select, and Calendar.",
+    "Add 'data-testid' to all buttons, links, form inputs, and interactive charts.",
+    "Ensure the fonts 'Chivo', 'IBM Plex Sans', and 'JetBrains Mono' are imported in index.css or via Google Fonts."
+  ],
+  "UNIVERSAL_GUIDELINES_FOR_MAIN_AGENT": [
+    "Do not converge toward generic 'AI slop' outputs. Use layered design elements with z-index hierarchy, but keep elevation flat (no heavy shadows).",
+    "Use 2-3x more spacing on outer layout containers (e.g., p-8 to p-12), but keep data rows tight and compact inside.",
+    "NEVER use generic placeholder URLs (like via.placeholder.com). Use the provided image URLs.",
+    "Do not center-align text by default. Left-align text, labels, and dense content for maximum readability.",
+    "Do not apply 'transition: all'. Use specific transitions (e.g., transition-colors, transition-opacity).",
+    "Do not use complete transparent background in headers, overlays, or dropdowns. They MUST have a solid dark background or heavy backdrop-blur.",
+    "Use pill-shaped or sharp rectangular buttons. Ensure hover states actively change color (e.g., hover:bg-slate-800)."
+  ],
+  "general_ui_ux_guidelines": [
+    "Visual Hierarchy: Make sentiment and bias data the most saturated elements on the screen. Backgrounds and text should remain muted.",
+    "Data Density: Prioritize keeping multiple perspectives visible above the fold. Use scrollable inner panes if necessary.",
+    "Neutrality: The UI must feel objective. Avoid overly playful animations; stick to crisp, instant micro-interactions.",
+    "Feedback: Instantly reflect active states on filters and semantic search results to keep the user engaged in the data exploration loop."
+  ]
+}
