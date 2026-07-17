@@ -8,6 +8,7 @@ import { fetchStories, fetchStats, triggerIngest } from "../lib/api";
 import StoryCard from "../components/StoryCard";
 import DigestSubscribe from "../components/DigestSubscribe";
 import TrendingSidebar from "../components/TrendingSidebar";
+import IngestProgress from "../components/IngestProgress";
 
 const SENTIMENTS = [
   { key: "all", label: "All" },
@@ -26,6 +27,7 @@ export default function Home() {
   const [sort, setSort] = useState("divided");
   const [minSources, setMinSources] = useState(2);
   const [q, setQ] = useState("");
+  const [activeTaskId, setActiveTaskId] = useState(null);
   const nav = useNavigate();
 
   const { data, isLoading, refetch } = useQuery({
@@ -36,7 +38,10 @@ export default function Home() {
 
   const ingest = useMutation({
     mutationFn: triggerIngest,
-    onSuccess: (r) => toast.success(`Ingestion started (${r.task_id.slice(0, 8)}…). New stories in ~2 min.`),
+    onSuccess: (r) => {
+      setActiveTaskId(r.task_id);
+      toast.message("Ingestion queued", { description: `Pulling from ${stats?.sources || 10} feeds. Watch live above.` });
+    },
     onError: () => toast.error("Could not trigger ingestion."),
   });
 
@@ -90,10 +95,11 @@ export default function Home() {
         <button
           data-testid="trigger-ingest-btn"
           onClick={() => { ingest.mutate(); }}
-          disabled={ingest.isPending}
-          className="mt-4 font-mono text-[10px] uppercase tracking-[0.2em] text-slate-500 hover:text-emerald-400 disabled:opacity-40 transition-colors duration-200"
+          disabled={ingest.isPending || !!activeTaskId}
+          className="mt-5 inline-flex items-center gap-2 border border-emerald-500/40 hover:border-emerald-400 hover:bg-emerald-500/10 disabled:opacity-40 disabled:cursor-not-allowed text-emerald-400 font-mono text-[11px] uppercase tracking-[0.2em] px-4 py-2.5 transition-colors duration-200"
         >
-          {ingest.isPending ? "queuing…" : "→ trigger fresh ingestion"}
+          <Zap className="w-3.5 h-3.5" strokeWidth={2} />
+          {ingest.isPending ? "queuing…" : activeTaskId ? "pipeline running…" : "trigger fresh ingestion"}
         </button>
       </section>
 
@@ -117,6 +123,7 @@ export default function Home() {
       {/* Feed + Sidebar */}
       <section className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-8">
         <div>
+          <IngestProgress taskId={activeTaskId} onComplete={() => refetch()} />
           <div className="flex items-baseline justify-between mb-6">
             <h2 className="font-display text-xl font-semibold text-slate-100">Live story feed</h2>
             <span className="overline">{data?.count ?? 0} events</span>
