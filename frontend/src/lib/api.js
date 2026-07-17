@@ -14,6 +14,11 @@ export const fetchStory = async (id) => {
   return data;
 };
 
+export const fetchCompare = async (id) => {
+  const { data } = await api.get(`/stories/${id}/compare`);
+  return data;
+};
+
 export const fetchStats = async () => {
   const { data } = await api.get("/stats");
   return data;
@@ -21,6 +26,36 @@ export const fetchStats = async () => {
 
 export const searchStories = async (query, limit = 12) => {
   const { data } = await api.post("/search", { query, limit });
+  return data;
+};
+
+export const fetchSources = async () => {
+  const { data } = await api.get("/sources");
+  return data;
+};
+
+export const fetchSource = async (name) => {
+  const { data } = await api.get(`/sources/${encodeURIComponent(name)}`);
+  return data;
+};
+
+export const fetchTrending = async () => {
+  const { data } = await api.get("/trending");
+  return data;
+};
+
+export const subscribeEmail = async (email) => {
+  const { data } = await api.post("/subscribe", { email });
+  return data;
+};
+
+export const triggerIngest = async () => {
+  const { data } = await api.post("/ingest/trigger");
+  return data;
+};
+
+export const fetchIngestHistory = async () => {
+  const { data } = await api.get("/ingest/history");
   return data;
 };
 

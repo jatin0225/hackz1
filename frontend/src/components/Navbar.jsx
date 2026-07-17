@@ -25,6 +25,9 @@ export default function Navbar() {
           <NavLink data-testid="nav-feed" to="/" end className={linkClass}>
             <span className="flex items-center gap-1.5"><Layers className="w-3 h-3" />Feed</span>
           </NavLink>
+          <NavLink data-testid="nav-sources" to="/sources" className={linkClass}>
+            Sources
+          </NavLink>
           <NavLink data-testid="nav-search" to="/search" className={linkClass}>
             <span className="flex items-center gap-1.5"><SearchIcon className="w-3 h-3" />Search</span>
           </NavLink>

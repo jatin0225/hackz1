@@ -26,9 +26,18 @@ export default function StoryDetail() {
   return (
     <div className="max-w-7xl mx-auto px-6 lg:px-10 py-10">
       {/* Breadcrumb */}
-      <Link to="/" data-testid="back-to-feed" className="inline-flex items-center gap-1.5 overline hover:text-slate-200 transition-colors duration-200 mb-6">
-        <ArrowLeft className="w-3 h-3" /> Back to feed
-      </Link>
+      <div className="flex items-center justify-between mb-6">
+        <Link to="/" data-testid="back-to-feed" className="inline-flex items-center gap-1.5 overline hover:text-slate-200 transition-colors duration-200">
+          <ArrowLeft className="w-3 h-3" /> Back to feed
+        </Link>
+        <Link
+          to={`/story/${id}/compare`}
+          data-testid="open-compare-btn"
+          className="font-mono text-[11px] uppercase tracking-wider px-3 py-1.5 border border-slate-800 hover:border-emerald-500/50 hover:text-emerald-400 text-slate-300 transition-colors duration-200"
+        >
+          Side-by-side compare →
+        </Link>
+      </div>
 
       {/* Section 1 — Header */}
       <motion.section initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mb-10">
